@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PriceTracker — E-Commerce Price Intelligence</title>
+    <meta name="description" content="Professional e-commerce price tracking dashboard with real-time scraping, analytics, and data export.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="header-left">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26">
+                    <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                <h1>PriceTracker</h1>
+            </div>
+            <span class="header-subtitle">Price Intelligence</span>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-sm btn-outline" id="btn-refresh" onclick="refreshAll()">⟳ Refresh</button>
+            <button class="btn btn-sm btn-outline" onclick="openConfigModal()">⚙ Settings</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Controls -->
+        <section class="controls-section glass-card" id="controls-section">
+            <div class="input-group">
+                <label>Category / Keyword</label>
+                <input type="text" id="keyword-input" placeholder="e.g. Laptops, Books, Electronics...">
+            </div>
+            <div class="input-group mode-group" style="max-width: 260px;">
+                <label>Source Mode</label>
+                <select id="mode-select">
+                    <option value="demo">Demo (books.toscrape.com)</option>
+                    <option value="amazon">Amazon (via SerpAPI)</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="btn-scrape" onclick="startScraping()">▶ Track Items</button>
+            <button class="btn btn-danger hidden" id="btn-stop" onclick="stopScraping()">■ Stop</button>
+            
+            <div id="live-feed" class="hidden">
+                <span class="pulse-dot"></span> Scraping: <span id="feed-counter">0</span> products found
+            </div>
+        </section>
+
+        <!-- Stats Grid -->
+        <section class="stats-grid" id="stats-grid">
+            <div class="stat-card glass-card">
+                <div class="stat-icon purple">📦</div>
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Products Tracked</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-icon rose">🚫</div>
+                <div class="stat-value" id="stat-out-of-stock">0</div>
+                <div class="stat-label">Out of Stock</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-icon emerald">📉</div>
+                <div class="stat-value" id="stat-price-drops">0</div>
+                <div class="stat-label">Price Drops</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-icon cyan">💰</div>
+                <div class="stat-value" id="stat-avg-price">$0</div>
+                <div class="stat-label">Avg Price</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-icon violet">🏷️</div>
+                <div class="stat-value" id="stat-categories">0</div>
+                <div class="stat-label">Categories</div>
+            </div>
+            <div class="stat-card glass-card">
+                <div class="stat-icon amber">✅</div>
+                <div class="stat-value" id="stat-stock-pct">0%</div>
+                <div class="stat-label">In Stock Rate</div>
+            </div>
+        </section>
+
+        <!-- Analytics Charts -->
+        <section class="analytics-section" id="analytics-section">
+            <div class="glass-card analytics-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">📊</span> Price Distribution</h3>
+                    <span class="card-badge">Histogram</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-price-dist"></canvas>
+                </div>
+            </div>
+            <div class="glass-card analytics-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">🍩</span> Stock Status</h3>
+                    <span class="card-badge">Overview</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-stock"></canvas>
+                </div>
+            </div>
+            <div class="glass-card analytics-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">📁</span> Category Breakdown</h3>
+                    <span class="card-badge">By Count</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-categories"></canvas>
+                </div>
+            </div>
+            <div class="glass-card analytics-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">💎</span> Avg Price by Category</h3>
+                    <span class="card-badge">Comparison</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="chart-cat-prices"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Top Movers -->
+        <section class="analytics-section" id="movers-section">
+            <div class="glass-card analytics-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">🔻</span> Top Price Drops</h3>
+                    <span class="card-badge">Savings</span>
+                </div>
+                <div class="movers-list" id="top-drops-list">
+                    <div class="empty-state">No price drops detected yet.</div>
+                </div>
+            </div>
+            <div class="glass-card analytics-card">
+                <div class="card-header">
+                    <h3><span class="card-icon">🔺</span> Top Price Increases</h3>
+                    <span class="card-badge">Alerts</span>
+                </div>
+                <div class="movers-list" id="top-increases-list">
+                    <div class="empty-state">No price increases detected yet.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Table -->
+        <section class="table-section glass-card" id="table-section">
+            <div class="table-header">
+                <h3>📋 Tracked Products</h3>
+                <div class="table-controls">
+                    <input type="text" id="table-search" placeholder="Search products..." oninput="handleSearch(this.value)">
+                    <select id="category-filter" onchange="handleCategoryFilter(this.value)">
+                        <option value="">All Categories</option>
+                    </select>
+                    <button class="btn btn-sm btn-outline" onclick="exportData('csv')">📄 CSV</button>
+                    <button class="btn btn-sm btn-outline" onclick="exportData('excel')">📊 Excel</button>
+                    <button class="btn btn-sm btn-outline" onclick="exportData('json')">{ } JSON</button>
+                    <button class="btn btn-sm btn-danger-outline" onclick="clearAllData()">🗑 Clear</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table id="products-table">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Current Price</th>
+                            <th>Original Price</th>
+                            <th>Change</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="products-tbody">
+                        <tr><td colspan="7" class="empty-state">
+                            <div class="empty-state-icon">📦</div>
+                            No products tracked yet. Enter a keyword above to start.
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <span id="page-info">Showing 0 of 0</span>
+                <div class="page-controls">
+                    <button class="btn btn-sm btn-outline" id="btn-prev" onclick="prevPage()">← Prev</button>
+                    <button class="btn btn-sm btn-outline" id="btn-next" onclick="nextPage()">Next →</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Price History Modal -->
+    <div id="history-modal" class="modal hidden">
+        <div class="modal-content glass-card chart-modal">
+            <div class="modal-header">
+                <h3 id="history-modal-title">Price History</h3>
+                <button class="close-btn" onclick="closeHistoryModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <canvas id="price-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div id="config-modal" class="modal hidden">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h3>⚙ Settings</h3>
+                <button class="close-btn" onclick="closeConfigModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>SerpAPI Key (for Amazon Mode)</label>
+                    <input type="password" id="serpapi-key" placeholder="Enter your API key...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeConfigModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/table.js"></script>
+</body>
+</html>
